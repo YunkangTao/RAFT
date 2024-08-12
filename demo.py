@@ -54,14 +54,19 @@ def read_video(path):
     return frames
 
 
-def save_flow_video(video_path, flow_up_list):
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_writer = cv2.VideoWriter(video_path, fourcc, 30.0, (frames[0].shape[1], frames[0].shape[0]))
+def save_flow_video(video_path, flow_list):
+    # get the height and width of the first frame
+    frames = read_video(video_path)
+    height, width = frames[0].shape[:2]
 
-    for flow_up in flow_up_list:
-        flow_up = flow_up[0].permute(1, 2, 0).cpu().numpy()
-        flow_up = flow_viz.flow_to_image(flow_up)
-        video_writer.write(np.concatenate([frames[0], flow_up], axis=0))
+    # create the video writer
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv2.VideoWriter(video_path, fourcc, 30.0, (width, height))
+
+    for frame, flow in zip(frames, flow_list):
+        flow = flow[0].permute(1, 2, 0).cpu().numpy()
+        flow = flow_viz.flow_to_image(flow)
+        video_writer.write(np.concatenate([frame, flow], axis=0))
 
     video_writer.release()
 
@@ -116,14 +121,16 @@ def demo_from_video(args):
             flow_low_list.append(flow_low)
             # viz(image1, flow_up)
 
-    save_flow_video(video_path, flow_up_list)
-    save_flow_video(video_path, flow_low_list)
+    save_flow_up_path = os.path.join(os.path.dirname(video_path), 'flow_up.mp4')
+    save_flow_down_path = os.path.join(os.path.dirname(video_path), 'flow_down.mp4')
+    save_flow_video(save_flow_up_path, flow_up_list)
+    save_flow_video(save_flow_down_path, flow_low_list)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', default="models/raft-things.pth", help="restore checkpoint")
-    parser.add_argument('--path', help="dataset for evaluation")
+    parser.add_argument('--path', default="assets/10041038.mp4", help="dataset for evaluation")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
