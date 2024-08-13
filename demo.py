@@ -79,6 +79,9 @@ def read_video(path):
             break
         frames.append(frame)
 
+    # concat the first frame to the end of the list
+    frames = frames + [frames[0]]
+
     height, width = frames[0].shape[:2]
     return frames, height, width
 
