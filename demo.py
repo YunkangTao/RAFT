@@ -1,3 +1,4 @@
+import copy
 import sys
 
 sys.path.append('core')
@@ -120,6 +121,7 @@ def demo_from_videos(args):
 
         flow_up_list = []
         image_list = []
+        binarazition_list = []
 
         with torch.no_grad():
             for i in range(len(frames) - 1):
@@ -131,6 +133,10 @@ def demo_from_videos(args):
                 image_list.append(image1)
 
                 flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)  # flow_low torch.Size([1, 2, 42, 75]); flow_up torch.Size([1, 2, 336, 600])
+
+                # binarize flow
+                binarazition_list.append(flow_viz.flow_to_mask(copy.deepcopy(flow_up)[0].permute(1, 2, 0).cpu().numpy()))
+
                 flow_up_list.append(flow_up)
 
             image_list.append(image2)
