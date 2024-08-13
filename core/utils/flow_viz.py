@@ -133,13 +133,16 @@ def flow_to_image(flow_uv, clip_flow=None, convert_to_bgr=False):
     return flow_uv_to_colors(u, v, convert_to_bgr)
 
 
-def flow_to_mask(flow_uv):
+def flow_to_mask(flow_uv, banerization_threshold_mode):
     """
     Creates a mask for flow values based on a given threshold.
+    在光流里，颜色越深表示运动越大，像素值越大；白色表示静止，像素值越小
+    在mask里，白色是255，表示运动；黑色是0，表示静止
 
     Args:
         flow_uv (np.ndarray): Flow UV image of shape [H,W,2]
-        threshold (float, optional): Threshold for flow values. Defaults to 0.05.
+        banerization_threshold_mode (str): Mode for thresholding banerization. Choices are 'average_number' and 'median_number'. Defaults to 'average_number'.
+            'average_number' uses the average value of flow magnitudes, 'median_number' uses the median value of flow magnitudes.
 
     Returns:
         np.ndarray: Flow mask of shape [H,W]
@@ -149,6 +152,9 @@ def flow_to_mask(flow_uv):
     u = flow_uv[:, :, 0]
     v = flow_uv[:, :, 1]
     rad = np.sqrt(np.square(u) + np.square(v))
-    rad_average = np.mean(rad)
-    mask = rad > rad_average
+    if banerization_threshold_mode == 'average_number':
+        rad_threshold = np.mean(rad)
+    elif banerization_threshold_mode == 'median_number':
+        rad_threshold = np.median(rad)
+    mask = rad > rad_threshold
     return mask.astype(np.uint8)
