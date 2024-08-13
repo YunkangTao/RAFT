@@ -97,10 +97,10 @@ def save_flow_video(video_path, flow_list, image_list):
 
     for image, flow in zip(image_list[1:], flow_list):
         flow = flow[0].permute(1, 2, 0).cpu().numpy()
-        flow = flow_viz.flow_to_image(flow)
-        image = image[0].permute(1, 2, 0).cpu().numpy()
+        flow = flow_viz.flow_to_image(flow).astype(np.uint8)
+        image = image[0].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
 
-        video_writer.write(np.concatenate([image, flow], axis=0))  # the width of the new image is twice the width of the original image, the height remains the same
+        video_writer.write(np.concatenate([image, flow], axis=1))  # the width of the new image is twice the width of the original image, the height remains the same
 
     video_writer.release()
 
@@ -136,7 +136,7 @@ def demo_from_videos(args):
             image_list.append(image2)
 
         # join the path of video name and save flow video
-        save_flow_up_path = os.path.join(args.results_direction_path, os.path.dirname(video_path.split('/')[-1]), 'flow_up.mp4')
+        save_flow_up_path = os.path.join(args.results_direction_path, video_path.split('/')[-1])
         save_flow_video(save_flow_up_path, flow_up_list, image_list)
 
 
