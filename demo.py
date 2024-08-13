@@ -65,7 +65,7 @@ def demo_from_frames(args):
 
 # convert opencv frame to pytorch tensor
 def cvt_to_tensor(frame):
-    return torch.from_numpy(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
+    return torch.from_numpy(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()[None].to(DEVICE)
 
 
 # read a video file
@@ -82,21 +82,25 @@ def read_video(path):
     # concat the first frame to the end of the list
     frames = frames + [frames[0]]
 
-    height, width = frames[0].shape[:2]
-    return frames, height, width
+    return frames
 
 
-def save_flow_video(video_path, flow_list, height, width, frames):
-    assert len(frames[1:]) == len(flow_list), "The number of frames and flow images must match"
+def save_flow_video(video_path, flow_list, image_list):
+    assert len(image_list[1:]) == len(flow_list), "The number of frames and flow images must match"
+
+    # get the width and height of flow_list
+    height, width = flow_list[0].shape[2:]
 
     # create the video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_writer = cv2.VideoWriter(video_path, fourcc, 30.0, (width * 2, height))
+    video_writer = cv2.VideoWriter(video_path, fourcc, 8.0, (width * 2, height))
 
-    for frame, flow in zip(frames[1:], flow_list):
+    for image, flow in zip(image_list[1:], flow_list):
         flow = flow[0].permute(1, 2, 0).cpu().numpy()
         flow = flow_viz.flow_to_image(flow)
-        video_writer.write(np.concatenate([frame, flow], axis=0))  # the width of the new image is twice the width of the original image, the height remains the same
+        image = image[0].permute(1, 2, 0).cpu().numpy()
+
+        video_writer.write(np.concatenate([image, flow], axis=0))  # the width of the new image is twice the width of the original image, the height remains the same
 
     video_writer.release()
 
@@ -112,29 +116,28 @@ def demo_from_videos(args):
     videos_path = glob.glob(os.path.join(args.videos_direction_path, '*.mp4'))
 
     for video_path in videos_path:
-        frames, height, width = read_video(video_path)
+        frames = read_video(video_path)
 
-        flow_low_list = []
         flow_up_list = []
+        image_list = []
 
         with torch.no_grad():
             for i in range(len(frames) - 1):
-                image1 = cvt_to_tensor(frames[i])
-                image2 = cvt_to_tensor(frames[i + 1])
+                image1 = cvt_to_tensor(frames[i])  # torch.Size([1, 3, 336, 596])
+                image2 = cvt_to_tensor(frames[i + 1])  # torch.Size([1, 3, 336, 596])
 
-                padder = InputPadder(image1.shape)
+                padder = InputPadder(image1.shape)  # Pads images such that dimensions are divisible by 8
                 image1, image2 = padder.pad(image1, image2)
+                image_list.append(image1)
 
-                flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
+                flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)  # flow_low torch.Size([1, 2, 42, 75]); flow_up torch.Size([1, 2, 336, 600])
                 flow_up_list.append(flow_up)
-                flow_low_list.append(flow_low)
-                # viz(image1, flow_up)
+
+            image_list.append(image2)
 
         # join the path of video name and save flow video
-        save_flow_up_path = os.path.join(args.results_direction_path, video_path.split('/')[-1], 'flow_up.mp4')
-        save_flow_down_path = os.path.join(os.path.dirname(video_path.split('/')[-1]), 'flow_down.mp4')
-        save_flow_video(save_flow_up_path, flow_up_list, height, width, frames)
-        save_flow_video(save_flow_down_path, flow_low_list, height, width, frames)
+        save_flow_up_path = os.path.join(args.results_direction_path, os.path.dirname(video_path.split('/')[-1]), 'flow_up.mp4')
+        save_flow_video(save_flow_up_path, flow_up_list, image_list)
 
 
 if __name__ == '__main__':
